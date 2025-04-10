@@ -136,7 +136,7 @@ public class TestCouponLockTest {
 	@Test
 	@DisplayName("낙관적으로 동시성 제어하기")
 	void executeCouponWithOptimisticLock() throws InterruptedException {
-		final int people = 100;
+		final int people = 300;
 		final Long couponId = 1L;
 		final Long userId = 1L;
 		final CountDownLatch countDownLatch = new CountDownLatch(people);
@@ -146,8 +146,47 @@ public class TestCouponLockTest {
 			.limit(people)
 			.toList();
 
+		long start = System.currentTimeMillis();
+
 		workers.forEach(Thread::start);
 		countDownLatch.await();
+
+		long end = System.currentTimeMillis();
+		long duration = end - start;
+
+		System.out.println("===================================================");
+		System.out.println("📌 Optimistic Lock Total execution time (ms): " + duration);
+		System.out.println("===================================================");
+
+		List<TestHistory> results = testHistoryRepository.findAll();
+		assertThat(results.size()).isEqualTo(20);
+	}
+
+	@Test
+	@DisplayName("비관적으로 동시성 제어하기")
+	void executeCouponWithPessimisticLock() throws InterruptedException {
+		final int people = 300;
+		final Long couponId = 1L;
+		final Long userId = 1L;
+		final CountDownLatch countDownLatch = new CountDownLatch(people);
+
+		List<Thread> workers = Stream
+			.generate(() -> new Thread(new LockWorker(couponId, userId, countDownLatch)))
+			.limit(people)
+			.toList();
+
+		long start = System.currentTimeMillis();
+
+		workers.forEach(Thread::start);
+		countDownLatch.await();
+
+		long end = System.currentTimeMillis();
+		long duration = end - start;
+
+		System.out.println("===================================================");
+		System.out.println("📌 Pessimistic Lock Total execution time (ms): " + duration);
+		System.out.println("===================================================");
+
 
 		List<TestHistory> results = testHistoryRepository.findAll();
 		assertThat(results.size()).isEqualTo(20);
@@ -196,6 +235,7 @@ public class TestCouponLockTest {
 	}
 
 	@Test
+	@DisplayName("비관적 락 데드락 테스트")
 	void testPessimisticLockCausedByDeadLock() throws InterruptedException {
 		ExecutorService executor = Executors.newFixedThreadPool(2);
 
@@ -245,40 +285,31 @@ public class TestCouponLockTest {
 				// testCouponService.useCouponWithIsolationLevel(couponId, userId);
 				// synchronizedFacade.useCouponWithSynchronized(couponId, userId);
 				// testCouponService.useCouponWithPessimisticLock(couponId, userId);
-				// runOptimisticLock(countDownLatch);
+				runOptimisticLock(countDownLatch);
 
 			} catch (Exception e) {
 				log.info("error = {}", e.getMessage());
-				// 	Thread.currentThread().interrupt();
+				Thread.currentThread().interrupt();
 			} finally {
-				// }
+				countDownLatch.countDown();
 			}
 		}
+	}
 
-		private void runOptimisticLock(CountDownLatch countDownLatch) {
-			while (true) {
-				try {
-					testCouponService.useCouponOptimisticLock(1L, 1L);
-					break;
-				} catch (ObjectOptimisticLockingFailureException e) {
-					try {
-						log.info("10ms 대기");
-						Thread.sleep(10); // 잠시 대기
-					} catch (InterruptedException ie) {
-						Thread.currentThread().interrupt();
-						throw new RuntimeException("Thread interrupted", ie);
-					}
-				} catch (IllegalStateException e) {
-					log.error("쿠폰 소진 → 종료: {}", e.getMessage());
-					break;
-				} catch (Exception e) {
-					log.error("예상하지 못한 예외 발생: {}", e.getClass().getSimpleName());
-					break;
-				}
+	private void runOptimisticLock(CountDownLatch countDownLatch) {
+		while (true) {
+			try {
+				testCouponService.useCouponOptimisticLock(1L, 1L);
+				break;
+			} catch (ObjectOptimisticLockingFailureException e) {
+				log.info("10ms 대기");
+			} catch (IllegalStateException e) {
+				log.error("쿠폰 소진 → 종료: {}", e.getMessage());
+				break;
+			} catch (Exception e) {
+				log.error("예상하지 못한 예외 발생: {}", e.getClass().getSimpleName());
+				break;
 			}
-
-			countDownLatch.countDown();
 		}
-
 	}
 }
