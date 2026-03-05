@@ -18,26 +18,26 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Profile;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import co.kr.woojjam.concurrency.config.TestDataBaseConfig;
 import co.kr.woojjam.concurrency.entity.TestCoupon;
 import co.kr.woojjam.concurrency.entity.TestHistory;
 import co.kr.woojjam.concurrency.entity.TestUser;
 import co.kr.woojjam.concurrency.repository.TestCouponRepository;
 import co.kr.woojjam.concurrency.repository.TestHistoryRepository;
 import co.kr.woojjam.concurrency.repository.TestUserRepository;
-import co.kr.woojjam.concurrency.service.SynchronizedFacade;
+import co.kr.woojjam.concurrency.service.TestSynchronizedFacade;
 import co.kr.woojjam.concurrency.service.TestCouponService;
-import jakarta.persistence.OptimisticLockException;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Profile("local")
 @SpringBootTest
-public class TestCouponLockTest {
+public class TestCouponLockTest extends TestDataBaseConfig {
 	//
 	@Autowired
 	private TestCouponService testCouponService;
 	@Autowired
-	private SynchronizedFacade synchronizedFacade;
+	private TestSynchronizedFacade testSynchronizedFacade;
 	@Autowired
 	private TestCouponRepository testCouponRepository;
 	@Autowired
@@ -283,9 +283,9 @@ public class TestCouponLockTest {
 			try {
 				// testCouponService.useCoupon(couponId, userId);
 				// testCouponService.useCouponWithIsolationLevel(couponId, userId);
-				// synchronizedFacade.useCouponWithSynchronized(couponId, userId);
+				testSynchronizedFacade.useCouponWithSynchronized(couponId, userId);
 				// testCouponService.useCouponWithPessimisticLock(couponId, userId);
-				runOptimisticLock(countDownLatch);
+				// runOptimisticLock(countDownLatch);
 
 			} catch (Exception e) {
 				log.info("error = {}", e.getMessage());

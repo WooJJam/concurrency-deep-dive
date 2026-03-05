@@ -7,7 +7,7 @@ import lombok.Synchronized;
 
 @Component
 @RequiredArgsConstructor
-public class SynchronizedFacade {
+public class TestSynchronizedFacade {
 
 	private final TestCouponService testCouponService;
 

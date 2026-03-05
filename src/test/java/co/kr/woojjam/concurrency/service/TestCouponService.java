@@ -118,11 +118,9 @@ public class TestCouponService {
 	public void useCouponOptimisticLockWithExplicitLocking(final Long couponId, final Long userId) throws
 		InterruptedException {
 
-		TestCoupon coupon = testCouponRepository.findByWithOptimistic(1L).orElseThrow(() -> new IllegalArgumentException("유저가 존재하지 않습니다."));
+		TestCoupon coupon = testCouponRepository.findByWithOptimistic(couponId).orElseThrow(() -> new IllegalArgumentException("쿠폰이 존재하지 않습니다."));
 		coupon.use();
 
-		Thread.sleep(1000);
-		log.info("----------- 1초 대기 -----------");
 		TestUser user = testUserRepository.findById(userId)
 			.orElseThrow(() -> new IllegalArgumentException("유저가 존재하지 않습니다."));
 
