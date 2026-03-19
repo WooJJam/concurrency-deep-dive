@@ -27,4 +27,12 @@ public class FutsalMatch {
 		this.name = name;
 		this.participants = participants;
 	}
+
+	public boolean isApply(final int count) {
+		if (count >= this.participants) {
+			throw new IllegalStateException("해당 매치는 마감되었습니다.");
+		}
+
+		return true;
+	}
 }

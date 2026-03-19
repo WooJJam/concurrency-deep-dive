@@ -82,7 +82,7 @@ public class MatchService {
 				|| participant.getStatus().equals(ParticipantStatus.CONFIRMED))
 			.count();
 
-		if (futsalMatch.getParticipants() > count) {
+		if (futsalMatch.isApply(count)) {
 			MatchParticipant participant = MatchParticipant.builder()
 				.status(ParticipantStatus.PENDING)
 				.matchId(matchId)
