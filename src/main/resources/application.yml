@@ -12,7 +12,7 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/woojjam?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME:root}
     password: ${DATABASE_PASSWORD:1234}
 ---
@@ -22,7 +22,7 @@ spring:
       on-profile: local
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
   sql:
     init:
       mode: always
@@ -34,7 +34,7 @@ spring:
       on-profile: test
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
