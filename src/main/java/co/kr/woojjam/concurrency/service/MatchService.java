@@ -1,11 +1,9 @@
 package co.kr.woojjam.concurrency.service;
 
-import java.util.List;
-import java.util.stream.LongStream;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.kr.woojjam.concurrency.client.PaymentClient;
 import co.kr.woojjam.concurrency.entity.match.FutsalMatch;
 import co.kr.woojjam.concurrency.entity.match.MatchParticipant;
 import co.kr.woojjam.concurrency.entity.match.type.ParticipantStatus;
@@ -20,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class MatchService {
 
+	private final PaymentClient paymentClient;
 	private final TestUserRepository userRepository;
 	private final MatchRepository matchRepository;
 	private final MatchParticipantRepository matchParticipantRepository;
@@ -34,18 +33,18 @@ public class MatchService {
 
 		matchRepository.save(futsalMatch);
 
-		List<MatchParticipant> participants = LongStream.range(0, 11)
-			.mapToObj(i -> MatchParticipant.builder()
-				.userId(i)
-				.matchId(futsalMatch.getId())
-				.status(ParticipantStatus.PENDING)
-				.build())
-			.toList();
+		// List<MatchParticipant> participants = LongStream.range(0, 11)
+		// 	.mapToObj(i -> MatchParticipant.builder()
+		// 		.userId(i)
+		// 		.matchId(futsalMatch.getId())
+		// 		.status(ParticipantStatus.PENDING)
+		// 		.build())
+		// 	.toList();
+		//
+		// log.info("participant size = {}", participants.size());
 
-		log.info("participant size = {}", participants.size());
-
-		matchParticipantRepository.saveAll(participants);
-		matchRepository.save(futsalMatch);
+		// matchParticipantRepository.saveAll(participants);
+		// matchRepository.save(futsalMatch);
 	}
 
 	@Transactional
@@ -91,5 +90,32 @@ public class MatchService {
 
 			matchParticipantRepository.save(participant);
 		}
+
+		paymentClient.pay();
+	}
+
+	@Transactional
+	public void joinMatchWithPessimisticLock(final Long matchId, final Long userId) {
+		FutsalMatch futsalMatch = matchRepository.findByIdWithPessimisticLock(matchId)
+			.orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
+
+		int count = (int) matchParticipantRepository.findAllByMatchIdWithPessimisticLock(matchId).stream()
+			.filter(participant -> participant.getStatus().equals(ParticipantStatus.PENDING)
+				|| participant.getStatus().equals(ParticipantStatus.CONFIRMED))
+			.count();
+
+		log.info("count = {}", count);
+
+		if (futsalMatch.isApply(count)) {
+			MatchParticipant participant = MatchParticipant.builder()
+				.status(ParticipantStatus.PENDING)
+				.matchId(matchId)
+				.userId(userId)
+				.build();
+
+			matchParticipantRepository.save(participant);
+		}
+
+		// paymentClient.pay();
 	}
 }
