@@ -95,6 +95,23 @@ public class MatchService {
 	}
 
 	@Transactional
+	public void joinMatchWithOptimisticLock(final Long matchId, final Long userId) {
+		FutsalMatch futsalMatch = matchRepository.findById(matchId)
+			.orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
+
+		if (futsalMatch.isApply(futsalMatch.getCurrentCount())) {
+
+			matchParticipantRepository.save(MatchParticipant.builder()
+				.status(ParticipantStatus.PENDING)
+				.matchId(matchId)
+				.userId(userId)
+				.build());
+
+			futsalMatch.increaseCount(); // currentCount 증가 → @Version 충돌 트리거
+		}
+	}
+
+	@Transactional
 	public void joinMatchWithPessimisticLock(final Long matchId, final Long userId) {
 		FutsalMatch futsalMatch = matchRepository.findByIdWithPessimisticLock(matchId)
 			.orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));

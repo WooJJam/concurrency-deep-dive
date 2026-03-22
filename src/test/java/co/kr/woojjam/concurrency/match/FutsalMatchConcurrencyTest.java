@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Profile;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -109,6 +110,49 @@ public class FutsalMatchConcurrencyTest {
 		// then - 네임드락 적용 전: 동시성 문제로 12개 초과 발생
 		int size = matchParticipantRepository.findAllByMatchIdAndUserId(matchId, userId).size();
 		assertThat(size).isEqualTo(12);
+	}
+
+	@Test
+	@DisplayName("낙관적 락 적용 시 재시도 없으면 12명 미만이 등록된다 (버전 충돌로 인한 손실)")
+	void 낙관적_락_재시도_없이_정원_미달() throws InterruptedException {
+		// given
+		Long matchId = futsalMatch.getId();
+		Long userId = user.getId();
+
+		// when
+		executeTest(50, 10, () -> matchService.joinMatchWithOptimisticLock(matchId, userId));
+
+		// then - 충돌로 롤백된 요청은 재시도 없이 소멸 → 12명 미달
+		int size = matchParticipantRepository.findAllByMatchIdAndUserId(matchId, userId).size();
+		assertThat(size).isLessThan(12);
+	}
+
+	@Test
+	@DisplayName("낙관적 락에 재시도를 적용하면 정확히 12명이 등록된다")
+	void 낙관적_락_재시도_적용() throws InterruptedException {
+		// given
+		Long matchId = futsalMatch.getId();
+		Long userId = user.getId();
+
+		// when - 버전 충돌 시 재시도, 정원 초과 시 종료
+		executeTest(50, 10, () -> {
+			while (true) {
+				try {
+					matchService.joinMatchWithOptimisticLock(matchId, userId);
+					return;
+				} catch (ObjectOptimisticLockingFailureException e) {
+					Thread.sleep(10);
+				} catch (IllegalStateException e) {
+					return; // 정원 초과 → 재시도 불필요
+				}
+			}
+		});
+
+		// then
+		int size = matchParticipantRepository.findAllByMatchIdAndUserId(matchId, userId).size();
+		int currentCount = matchRepository.findById(matchId).get().getCurrentCount();
+		assertThat(size).isEqualTo(12);
+		assertThat(currentCount).isEqualTo(12);
 	}
 
 	private void executeTest(int people, int threadPoolSize, MatchTask task) throws InterruptedException {
