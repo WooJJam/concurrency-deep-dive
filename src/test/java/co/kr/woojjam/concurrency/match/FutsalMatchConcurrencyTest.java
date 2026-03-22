@@ -93,7 +93,22 @@ public class FutsalMatchConcurrencyTest {
 
 		// then - 네임드락 적용 전: 동시성 문제로 12개 초과 발생
 		int size = matchParticipantRepository.findAllByMatchIdAndUserId(matchId, userId).size();
-		assertThat(size).isGreaterThan(12);
+		assertThat(size).isEqualTo(12);
+	}
+
+	@Test
+	@DisplayName("비관적 락과 Gap Lock으로 50명이 매치에 신청하면 12명이 등록된다. (데드락 발생)")
+	void 비관적_락과_GAP_Lock_적용() throws InterruptedException {
+		// given
+		Long matchId = futsalMatch.getId();
+		Long userId = user.getId();
+
+		// when
+		executeTest(50, 10, () -> matchService.joinMatchWithPessimisticLockAndGapLock(matchId, userId));
+
+		// then - 네임드락 적용 전: 동시성 문제로 12개 초과 발생
+		int size = matchParticipantRepository.findAllByMatchIdAndUserId(matchId, userId).size();
+		assertThat(size).isEqualTo(12);
 	}
 
 	private void executeTest(int people, int threadPoolSize, MatchTask task) throws InterruptedException {
