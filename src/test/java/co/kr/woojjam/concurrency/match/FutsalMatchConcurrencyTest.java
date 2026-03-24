@@ -141,6 +141,7 @@ public class FutsalMatchConcurrencyTest {
 					matchService.joinMatchWithOptimisticLock(matchId, userId);
 					return;
 				} catch (ObjectOptimisticLockingFailureException e) {
+					log.info("동시성 충돌 발생");
 					Thread.sleep(10);
 				} catch (IllegalStateException e) {
 					return; // 정원 초과 → 재시도 불필요

@@ -15,6 +15,15 @@ spring:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME:root}
     password: ${DATABASE_PASSWORD:1234}
+
+  lock-datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME:root}
+    password: ${DATABASE_PASSWORD:1234}
+    hikari:
+      pool-name: lock-pool
+      maximum-pool-size: 5
 ---
 spring:
   config:
