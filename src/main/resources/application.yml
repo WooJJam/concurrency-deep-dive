@@ -23,7 +23,6 @@ spring:
     password: ${DATABASE_PASSWORD:1234}
     hikari:
       pool-name: lock-pool
-      maximum-pool-size: 5
 ---
 spring:
   config:

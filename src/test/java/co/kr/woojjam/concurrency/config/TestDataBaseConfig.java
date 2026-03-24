@@ -30,6 +30,9 @@ public abstract class TestDataBaseConfig {
 		registry.add("spring.datasource.url", MYSQL_CONTAINER::getJdbcUrl);
 		registry.add("spring.datasource.username", MYSQL_CONTAINER::getUsername);
 		registry.add("spring.datasource.password", MYSQL_CONTAINER::getPassword);
+		registry.add("spring.lock-datasource.url", MYSQL_CONTAINER::getJdbcUrl);
+		registry.add("spring.lock-datasource.username", MYSQL_CONTAINER::getUsername);
+		registry.add("spring.lock-datasource.password", MYSQL_CONTAINER::getPassword);
 		registry.add("spring.data.redis.host", REDIS_CONTAINER::getHost);
 		registry.add("spring.data.redis.port",
 			() -> String.valueOf(REDIS_CONTAINER.getMappedPort(6379)));
