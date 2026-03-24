@@ -3,9 +3,6 @@ package co.kr.woojjam.concurrency.match;
 import static org.assertj.core.api.Assertions.*;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -13,27 +10,52 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
-import co.kr.woojjam.concurrency.config.TestDataBaseConfig;
+import com.redis.testcontainers.RedisContainer;
+
+import co.kr.woojjam.concurrency.common.ConcurrencyExecutor;
 import co.kr.woojjam.concurrency.entity.TestUser;
 import co.kr.woojjam.concurrency.entity.match.FutsalMatch;
 import co.kr.woojjam.concurrency.entity.match.MatchParticipant;
 import co.kr.woojjam.concurrency.entity.match.type.ParticipantStatus;
+import co.kr.woojjam.concurrency.facade.MatchApplyFacade;
 import co.kr.woojjam.concurrency.repository.TestUserRepository;
 import co.kr.woojjam.concurrency.repository.match.MatchParticipantRepository;
 import co.kr.woojjam.concurrency.repository.match.MatchRepository;
-import co.kr.woojjam.concurrency.service.MatchService;
 
-@DataJpaTest
-@Import(MatchService.class)
-public class FutsalMatchNamedLockTest extends TestDataBaseConfig {
+@Testcontainers
+@SpringBootTest
+@ActiveProfiles("test")
+public class FutsalMatchNamedLockTest {
+
+	@Container
+	static MySQLContainer<?> mysql = new MySQLContainer<>(DockerImageName.parse("mysql:8.0.35"));
+
+	@Container
+	static RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7.2.4-alpine"));
+
+	@DynamicPropertySource
+	static void setProperties(DynamicPropertyRegistry registry) {
+		registry.add("spring.datasource.url", mysql::getJdbcUrl);
+		registry.add("spring.datasource.username", mysql::getUsername);
+		registry.add("spring.datasource.password", mysql::getPassword);
+		registry.add("spring.lock-datasource.url", mysql::getJdbcUrl);
+		registry.add("spring.lock-datasource.username", mysql::getUsername);
+		registry.add("spring.lock-datasource.password", mysql::getPassword);
+		registry.add("spring.data.redis.host", redis::getHost);
+		registry.add("spring.data.redis.port", () -> String.valueOf(redis.getMappedPort(6379)));
+	}
 
 	@Autowired
-	private MatchService matchService;
+	private MatchApplyFacade matchApplyFacade;
 
 	@Autowired
 	private MatchRepository matchRepository;
@@ -59,23 +81,22 @@ public class FutsalMatchNamedLockTest extends TestDataBaseConfig {
 			.build());
 	}
 
-	/*
-	시나리오 1: 단일 유저가 매치에 신청하면 PENDING 상태로 참가자가 등록된다
-	시나리오 2: 정원이 가득 찬 매치에 신청하면 실패한다
-	시나리오 3: 50명 동시성 테스트
-	시나리오 4: 300명이 동시에 12명 정원 매치에 신청하면 정확히 12명만 참가 확정된다
-
-	 */
+	@AfterEach
+	void cleanup() {
+		matchParticipantRepository.deleteAll();
+		matchRepository.deleteAll();
+		testUserRepository.deleteAll();
+	}
 
 	@Test
-	@DisplayName("단일 유저가 매치에 신청하면 결제 전 PENDING 상태로 참가자가 등록된다")
+	@DisplayName("단일 유저가 네임드 락으로 매치에 신청하면 PENDING 상태로 참가자가 등록된다")
 	void 단일_유저_매치_성공() {
 		// given
 		Long matchId = futsalMatch.getId();
 		Long userId = user.getId();
 
 		// when
-		matchService.joinMatch(matchId, userId);
+		matchApplyFacade.joinMatchWithNamedLock(matchId, userId);
 
 		// then
 		MatchParticipant matchParticipant = matchParticipantRepository.findByMatchIdAndUserId(matchId, userId).get();
@@ -86,33 +107,39 @@ public class FutsalMatchNamedLockTest extends TestDataBaseConfig {
 	}
 
 	@Test
-	@DisplayName("정원이 가득 찬 매치에 신청하면 실패한다.")
+	@DisplayName("정원이 가득 찬 매치에 네임드 락으로 신청하면 실패한다")
 	void 정원이_가득_찬_경우_신청_실패() {
-
 		// given
 		Long matchId = futsalMatch.getId();
 		Long userId = user.getId();
 
 		List<MatchParticipant> matchParticipants = LongStream.range(0, 12)
-			.mapToObj((i) -> {
-				return MatchParticipant.builder()
-					.matchId(matchId)
-					.userId(i)
-					.status(ParticipantStatus.CONFIRMED)
-					.build();
-			}).toList();
+			.mapToObj(i -> MatchParticipant.builder()
+				.matchId(matchId)
+				.userId(i)
+				.status(ParticipantStatus.CONFIRMED)
+				.build())
+			.toList();
 
 		matchParticipantRepository.saveAll(matchParticipants);
 
 		// when & then
-		assertThatThrownBy(() -> matchService.joinMatch(matchId, userId))
+		assertThatThrownBy(() -> matchApplyFacade.joinMatchWithNamedLock(matchId, userId))
 			.isInstanceOf(IllegalStateException.class);
 	}
 
-	@AfterEach
-	void cleanup() {
-		matchParticipantRepository.deleteAll();
-		matchRepository.deleteAll();
-		testUserRepository.deleteAll();
+	@Test
+	@DisplayName("네임드 락으로 50명이 동시에 신청하면 정확히 12명만 등록된다")
+	void 네임드_락_동시성_테스트() throws InterruptedException {
+		// given
+		Long matchId = futsalMatch.getId();
+		Long userId = user.getId();
+
+		// when
+		ConcurrencyExecutor.execute(50, 10, () -> matchApplyFacade.joinMatchWithNamedLock(matchId, userId));
+
+		// then
+		int size = matchParticipantRepository.findAllByMatchIdAndUserId(matchId, userId).size();
+		assertThat(size).isEqualTo(12);
 	}
 }

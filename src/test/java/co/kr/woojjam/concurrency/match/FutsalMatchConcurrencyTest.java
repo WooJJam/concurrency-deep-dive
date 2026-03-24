@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Profile;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import co.kr.woojjam.concurrency.facade.MatchApplyFacade;
 import lombok.extern.slf4j.Slf4j;
 
 import co.kr.woojjam.concurrency.config.TestDataBaseConfig;
@@ -36,6 +37,9 @@ public class FutsalMatchConcurrencyTest {
 
 	@Autowired
 	private MatchRepository matchRepository;
+
+	@Autowired
+	private MatchApplyFacade matchApplyFacade;
 
 	@Autowired
 	private MatchParticipantRepository matchParticipantRepository;
