@@ -1,6 +1,7 @@
 package co.kr.woojjam.concurrency.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import co.kr.woojjam.concurrency.client.PaymentClient;
@@ -111,22 +112,24 @@ public class MatchService {
 		}
 	}
 
-	@Transactional
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void joinMatchWithNamedLock(final Long matchId, final Long userId) {
 		FutsalMatch futsalMatch = matchRepository.findById(matchId)
 			.orElseThrow(() -> new IllegalArgumentException("매치를 찾을 수 없습니다."));
 
-		int count = (int) matchParticipantRepository.findAllByMatchId(matchId).stream()
-			.filter(participant -> participant.getStatus().equals(ParticipantStatus.PENDING)
-				|| participant.getStatus().equals(ParticipantStatus.CONFIRMED))
-			.count();
+		// int count = (int) matchParticipantRepository.findAllByMatchId(matchId).stream()
+		// 	.filter(participant -> participant.getStatus().equals(ParticipantStatus.PENDING)
+		// 		|| participant.getStatus().equals(ParticipantStatus.CONFIRMED))
+		// 	.count();
 
-		if (futsalMatch.isApply(count)) {
+		if (futsalMatch.isApply(futsalMatch.getCurrentCount())) {
 			matchParticipantRepository.save(MatchParticipant.builder()
 				.status(ParticipantStatus.PENDING)
 				.matchId(matchId)
 				.userId(userId)
 				.build());
+
+			futsalMatch.increaseCount();
 		}
 	}
 

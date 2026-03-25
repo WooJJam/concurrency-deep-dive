@@ -5,7 +5,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,8 +22,8 @@ public class FutsalMatch {
 	private int participants;
 	private int currentCount;
 
-	@Version
-	private Long version;
+	// @Version
+	// private Long version;
 
 	@Builder
 	public FutsalMatch(final Long id, final String name, final int participants) {

@@ -13,8 +13,22 @@ import lombok.extern.slf4j.Slf4j;
 public class NamedLockExecutor {
 
 	private final DistributedLockRepository<NamedLockOptions> lockRepository;
+	private final MatchRepository matchRepository;
+
+	// public NamedLockExecutor(
+	// 	@Qualifier("lockRepository") DistributedLockRepository<NamedLockOptions> lockRepository,
+	// 	MatchRepository matchRepository
+	// ) {
+	// 	this.lockRepository = lockRepository;
+	// 	this.matchRepository = matchRepository;
+	// }
 
 	public void executeWithLock(final NamedLockOptions namedLockOptions, final Runnable action) {
 		lockRepository.withLock(namedLockOptions, action);
+	}
+
+	public void executeWithLockByNativeQuery(final NamedLockOptions namedLockOptions, final Runnable action) {
+		matchRepository.getNamedLockByNativeQuery(namedLockOptions.key(), namedLockOptions.timeoutSeconds());
+		action.run();
 	}
 }
